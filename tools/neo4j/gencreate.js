@@ -24,39 +24,45 @@ function createCypher(prefix, name, label, obj) {
     cypher += "\nCREATE(" + prefix + name + ":" + label + ser + ")"
 }
 
-function createEdge(lhs, dependency, rhs) {
-    cypher += "\nCREATE(" + lhs + ")-[" + dependency + "]->(" + rhs + ")"
-}
-
 edges = []
 
-function rowToCypher(prefix, cells, depCol) {
-    if (cells.length == 2)
-        return function() { 
-        }
-    
-    return function() {
-        let depText = cells[2].textContent.trim()
-        let deps = depText.split(",")
-        deps.forEach(function(depName) {
-            depName = depName.trim()
-            if (!depCol || !depName)
-                return
+function createEdge(lhs, dependency, rhs) {
+    edges.push(function() {
+        cypher += "\nCREATE(" + lhs + ")-[" + dependency + "]->(" + rhs + ")"
+    })
+}
 
-            if (depCol == "caps")
-                edges.push(function(){
-                    createEdge(prefix + name, ":REQUIRES", "C_" + depName)
-                })
-            else if(depCol == "deps")
-                edges.push(function() {
-                    createEdge(prefix + name, ":DEPENDSON", "C_" + depName)
-                })
-        })
-    }
+function capabilityColumn(prefix, name, cells, dependency) {
+    if (cells.length <= 2)
+        return
+
+    let depText = cells[2].textContent.trim()
+    let deps = depText.split(",")
+    deps.forEach(function(depName) {
+        depName = depName.trim()
+        if (!depName)
+            return
+
+        createEdge(prefix + name, dependency, "C_" + depName)
+    })
+}
+
+extensionNames = new Set();
+
+function extensionColumn(prefix, name, cells) {
+    if (cells.length <= 3)
+        return
+
+    let extElements = cells[3].querySelectorAll("strong")
+    extElements.forEach(function(extElement) {
+        // Extension names are global anyway so no need to prefix
+        let extensionName = extElement.textContent
+        extensionNames.add(extensionName)
+        createEdge(prefix + name, ":ENABLEDBY", extensionName)
+    })
 }
 
 instructions = {};
-linkers = [];
 
 [
 "#_a_id_instructions_a_instructions",
@@ -73,6 +79,8 @@ linkers = [];
             let caps = tr.querySelectorAll("td:nth-of-type(2) p strong")
             let capabilities = []
             caps.forEach(function(cap) {
+                if (!cap.textContent)
+                    return
                 capabilities.push(cap.textContent)
             })
             let link = text.querySelector("a")
@@ -86,9 +94,7 @@ linkers = [];
                 value: opCode,
             })
             capabilities.forEach(function(cap) {
-                edges.push(function() {
-                    createEdge("Inst" + instName, ":NEEDS", "C_" + cap)
-                })
+               createEdge("Inst" + instName, ":NEEDS", "C_" + cap)
             }) 
         })
     })
@@ -106,39 +112,61 @@ linkers = [];
     let table = section.querySelector("table:first-of-type")
     let tableHeaders = table.querySelectorAll("thead tr:first-of-type th")
 
-    let depCol = null
-    if (tableHeaders.length > 1) {
-        let depHeadingText = tableHeaders[1].textContent
-        if (depHeadingText == "Required Capability")
-            depCol = "caps"
-        else
-            depCol = "deps"
-    }
-
     let tableHeaderText = tableHeaders[0].textContent
     let text = tableHeaderText.trim()
     let prefix = buildPrefix(text)
+
     if (prefix.length != 0)
         prefix += "_"
 
-    let label = buildLabel(text)
+    let cols = [function(name, cells) {
+        let label = buildLabel(text)
+        createCypher(prefix, name, label, {
+            name: name,
+            value: parseInt(cells[0].textContent, 10),
+        })
+    }]
+    if (tableHeaders.length > 2) {
+        let depHeadingText = tableHeaders[2].textContent.trim()
+        if (depHeadingText != "Enabled by Extension")
+            alert("Unhandled header1 " +  depHeadingText)
+
+        cols.push(function(name, cells) {
+            extensionColumn(prefix, name, cells)
+        })
+    }
+    if (tableHeaders.length > 1) {
+
+        let depHeadingText = tableHeaders[1].textContent.trim()
+        if (depHeadingText == "Required Capability")
+            cols.push(function(name, cells) {
+                capabilityColumn(prefix, name, cells, ":REQUIRES")    
+            })
+        else if(depHeadingText == "Depends On")
+            cols.push(function(name, cells) {
+                capabilityColumn(prefix, name, cells, ":DEPENDSON")    
+            })
+        else
+            alert("Unhandled header " +  depHeadingText)
+
+        
+    }
+
+
 
     let rows = table.querySelectorAll("tbody tr")
     rows.forEach(function(row) {
         let cells = row.querySelectorAll("td")
         let name = cells[1].querySelector("strong").textContent
-        createCypher(prefix, name, label, {
-            name: name,
-            value: parseInt(cells[0].textContent, 10),
+        cols.forEach(function(col) {
+            col(name, cells)
         })
+    })
+})
 
-        linkers.push(function() {
-            rowToCypher(prefix, cells, depCol)
-        })
-    }) 
-
-    linkers.forEach(function(linker) {
-        linker()
+extensionNames.forEach(function(extensionName) {
+    createCypher("", extensionName, "Extension", {
+        name: extensionName,
     })
 })
 
@@ -147,3 +175,4 @@ edges.forEach(function(link) {
 })
 
 cypher
+
