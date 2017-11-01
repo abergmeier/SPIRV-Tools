@@ -14,7 +14,7 @@ function buildLabel(text) {
     return text.replace(" ", "")
 }
 
-cypher = ""
+cypher = "MATCH (n)\nDETACH DELETE n"
 
 function createCypher(prefix, name, label, obj) {
     let ser = JSON.stringify(obj)
@@ -24,8 +24,8 @@ function createCypher(prefix, name, label, obj) {
     cypher += "\nCREATE(" + prefix + name + ":" + label + ser + ")"
 }
 
-function createEdge(lhs, rhs) {
-    cypher += "\nCREATE(" + lhs + ")-[:REQUIRES]->(" + rhs + ")"
+function createEdge(lhs, dependency, rhs) {
+    cypher += "\nCREATE(" + lhs + ")-[" + dependency + "]->(" + rhs + ")"
 }
 
 function rowToCypher(prefix, label, row, depCol) {
@@ -49,12 +49,39 @@ function rowToCypher(prefix, label, row, depCol) {
                 return
 
             if (depCol == "caps")
-                createEdge(prefix + name, "C_" + depName)
+                createEdge(prefix + name, ":REQUIRES", "C_" + depName)
             else if(depCol == "deps")
-                createEdge(prefix + name, "C_" + depName)
+                createEdge(prefix + name, ":DEPENDSON", "C_" + depName)
         })
     }
 }
+
+instructions = {};
+
+[
+"#_a_id_instructions_a_instructions",
+].forEach(function(selector) {
+    let heading = document.querySelector(selector)
+    let section = heading.parentElement
+    let subSections = section.querySelectorAll(".sect3")
+    subSections.forEach(function(subSection) {
+        let tables = subSection.querySelectorAll("table")
+        tables.forEach(function(table) {
+            let tbody = table.querySelector("tbody")
+            let text = tbody.querySelector("tr td p")
+            let link = text.querySelector("a")
+            let linkId = link.id
+            let instName = text.querySelector("strong").textContent
+            instructions[linkId] = null
+            let opContent = tbody.querySelector("tr:nth-of-type(2) td:nth-of-type(2)").textContent
+            let opCode = parseInt(opContent)
+            createCypher("Inst", instName, "Instruction", {
+                name: instName,
+                value: opCode,
+            })
+        })
+    })
+}); // WTF do I need a ; here?
 
 [
 "#_a_id_capability_a_capability",
