@@ -28,14 +28,9 @@ function createEdge(lhs, dependency, rhs) {
     cypher += "\nCREATE(" + lhs + ")-[" + dependency + "]->(" + rhs + ")"
 }
 
-function rowToCypher(prefix, label, row, depCol) {
-    let cells = row.querySelectorAll("td")
-    let name = cells[1].querySelector("strong").textContent
-    createCypher(prefix, name, label, {
-        name: name,
-        value: parseInt(cells[0].textContent, 10),
-    })
+edges = []
 
+function rowToCypher(prefix, cells, depCol) {
     if (cells.length == 2)
         return function() { 
         }
@@ -49,14 +44,19 @@ function rowToCypher(prefix, label, row, depCol) {
                 return
 
             if (depCol == "caps")
-                createEdge(prefix + name, ":REQUIRES", "C_" + depName)
+                edges.push(function(){
+                    createEdge(prefix + name, ":REQUIRES", "C_" + depName)
+                })
             else if(depCol == "deps")
-                createEdge(prefix + name, ":DEPENDSON", "C_" + depName)
+                edges.push(function() {
+                    createEdge(prefix + name, ":DEPENDSON", "C_" + depName)
+                })
         })
     }
 }
 
 instructions = {};
+linkers = [];
 
 [
 "#_a_id_instructions_a_instructions",
@@ -68,17 +68,28 @@ instructions = {};
         let tables = subSection.querySelectorAll("table")
         tables.forEach(function(table) {
             let tbody = table.querySelector("tbody")
-            let text = tbody.querySelector("tr td p")
+            let tr = tbody.querySelector("tr")
+            let text = tr.querySelector("td p")
+            let caps = tr.querySelectorAll("td:nth-of-type(2) p strong")
+            let capabilities = []
+            caps.forEach(function(cap) {
+                capabilities.push(cap.textContent)
+            })
             let link = text.querySelector("a")
             let linkId = link.id
             let instName = text.querySelector("strong").textContent
-            instructions[linkId] = null
+            instructions[linkId] = table
             let opContent = tbody.querySelector("tr:nth-of-type(2) td:nth-of-type(2)").textContent
             let opCode = parseInt(opContent)
             createCypher("Inst", instName, "Instruction", {
                 name: instName,
                 value: opCode,
             })
+            capabilities.forEach(function(cap) {
+                edges.push(function() {
+                    createEdge("Inst" + instName, ":NEEDS", "C_" + cap)
+                })
+            }) 
         })
     })
 }); // WTF do I need a ; here?
@@ -113,9 +124,17 @@ instructions = {};
     let label = buildLabel(text)
 
     let rows = table.querySelectorAll("tbody tr")
-    let linkers = []
     rows.forEach(function(row) {
-        linkers.push(rowToCypher(prefix, label, row, depCol))
+        let cells = row.querySelectorAll("td")
+        let name = cells[1].querySelector("strong").textContent
+        createCypher(prefix, name, label, {
+            name: name,
+            value: parseInt(cells[0].textContent, 10),
+        })
+
+        linkers.push(function() {
+            rowToCypher(prefix, cells, depCol)
+        })
     }) 
 
     linkers.forEach(function(linker) {
@@ -123,5 +142,8 @@ instructions = {};
     })
 })
 
-cypher
+edges.forEach(function(link) {
+    link()
+})
 
+cypher
