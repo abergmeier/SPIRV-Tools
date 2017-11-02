@@ -114,6 +114,12 @@ instructions = {};
 "#_a_id_image_format_a_image_format",
 "#_a_id_image_channel_order_a_image_channel_order",
 "#_a_id_image_channel_data_type_a_image_channel_data_type",
+"#_a_id_fp_fast_math_mode_a_fp_fast_math_mode",
+"#_a_id_fp_rounding_mode_a_fp_rounding_mode",
+"#_a_id_linkage_type_a_linkage_type",
+"#_a_id_access_qualifier_a_access_qualifier",
+"#_a_id_function_parameter_attribute_a_function_parameter_attribute",
+"#_a_id_decoration_a_decoration",
 ].forEach(function(selector) {
     let heading = document.querySelector(selector)
     let section = heading.parentElement
