@@ -11,7 +11,7 @@ function buildPrefix(text) {
 }
 
 function buildLabel(text) {
-    return text.replace(" ", "")
+    return text.replace(/\s/g, "")
 }
 
 cypher = "MATCH (n)\nDETACH DELETE n"
@@ -106,6 +106,14 @@ instructions = {};
 "#_a_id_execution_model_a_execution_model",
 "#_a_id_addressing_model_a_addressing_model",
 "#_a_id_memory_model_a_memory_model",
+"#_a_id_execution_mode_a_execution_mode",
+"#_a_id_storage_class_a_storage_class",
+"#_a_id_dim_a_dim",
+"#_a_id_sampler_addressing_mode_a_sampler_addressing_mode",
+"#_a_id_sampler_filter_mode_a_sampler_filter_mode",
+"#_a_id_image_format_a_image_format",
+"#_a_id_image_channel_order_a_image_channel_order",
+"#_a_id_image_channel_data_type_a_image_channel_data_type",
 ].forEach(function(selector) {
     let heading = document.querySelector(selector)
     let section = heading.parentElement
@@ -128,12 +136,16 @@ instructions = {};
     }]
     if (tableHeaders.length > 2) {
         let depHeadingText = tableHeaders[2].textContent.trim()
-        if (depHeadingText != "Enabled by Extension")
+        if (depHeadingText == "Enabled by Extension")
+            cols.push(function(name, cells) {
+                extensionColumn(prefix, name, cells)
+            })
+        else if(depHeadingText == "Extra Operands")
+            ; // Ignore
+        else
             alert("Unhandled header1 " +  depHeadingText)
 
-        cols.push(function(name, cells) {
-            extensionColumn(prefix, name, cells)
-        })
+
     }
     if (tableHeaders.length > 1) {
 
@@ -146,10 +158,12 @@ instructions = {};
             cols.push(function(name, cells) {
                 capabilityColumn(prefix, name, cells, ":DEPENDSON")    
             })
+        else if(depHeadingText == "Enabling Capabilities")
+            cols.push(function(name, cells) {
+                capabilityColumn(prefix, name, cells, ":ENABLES")    
+            })
         else
             alert("Unhandled header " +  depHeadingText)
-
-        
     }
 
 
@@ -175,4 +189,3 @@ edges.forEach(function(link) {
 })
 
 cypher
-
